@@ -306,8 +306,8 @@ if (SERVER_MODE === "cluster" && cluster.isMaster) {
     if (req.isAuthenticated()) {
 
       let nombre = req.user.displayName
-      let foto = req.user.photos[0].value
-      let email = req.user.emails[0].value
+      //let foto = req.user.photos[0].value
+      //let email = req.user.emails[0].value
       let asunto = 'logging In'
       let mensaje = 'Ingresó ' + nombre + ' en la fecha ' + new Date().toLocaleString() 
 
@@ -377,6 +377,76 @@ if (SERVER_MODE === "cluster" && cluster.isMaster) {
         res.render("logout", { nombre });
     });
   });
+
+  // ------------------------------------------------------------------------------
+  //   GraphQL
+  // ------------------------------------------------------------------------------
+  var { graphqlHTTP }  = require('express-graphql');
+  var { buildSchema } = require('graphql');
+
+  // GraphQL schema
+  //https://graphql.org/graphql-js/basic-types/
+  var schema = buildSchema(`
+  type Query {
+    product(_id: String!): Product,
+    products(title: String): [Product]
+  },
+  type Mutation {
+    updateProduct(_id: String!, title: String!, price: Int!, thumbnail:  String!): Product
+  },
+
+  type Product {
+    _id: String
+    title: String
+    price: Int
+    thumbnail: String
+  }
+  `);
+
+  const getProductsData = async () => {
+  let productoService = new ProductoService();
+  let productos = await productoService.getAllProductos();
+  return productos;
+  }
+
+  let productsData = getProductsData();
+
+  const getProduct = function(args) {
+  let _id = args._id;
+ // console.log(productsData);
+  return productsData.filter(product => {
+      return product._id == _id;
+  })[0];
+  }
+
+  const getProducts = function() {
+  return productsData
+  }
+
+  const updateProduct = function({_id, title, price, thumbnail}) {
+  productsData.map(product => {
+      if (product._id === _id) {
+          product.title = title;
+          product.price = price;
+          product.thumbnail = thumbnail;
+          return product;
+      }
+  });
+  return productsData.filter(product => product._id === _id) [0];
+  }
+
+  // Root resolver
+  let root = {
+    product: getProduct,
+    products: getProducts,
+    updateProduct: updateProduct
+  };
+
+  app.use('/graphql', graphqlHTTP({
+    schema: schema,
+    rootValue: root,
+    graphiql: true
+  }));
 
   // ------------------------------------------------------------------------------
   //  socket io
